@@ -1,0 +1,75 @@
+{
+  "name": "line-sorter",
+  "displayName": "line sorter",
+  "description": "Sort selected lines ascending/descending, keyed only on the selected portion of each line, treating multiple non-contiguous selections as separate regions, with correct numeric (natural) ordering.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.121.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "publisher": "rssaromeo",
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "line-sorter.sortAsc",
+        "title": "Sort Selected Lines: Ascending"
+      },
+      {
+        "command": "line-sorter.sortDesc",
+        "title": "Sort Selected Lines: Descending"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "line-sorter.sortAsc",
+          "when": "editorHasSelection",
+          "group": "1_modification"
+        },
+        {
+          "command": "line-sorter.sortDesc",
+          "when": "editorHasSelection",
+          "group": "1_modification"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "line-sorter.sortAsc",
+        "key": "ctrl+alt+s ctrl+alt+a",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "line-sorter.sortDesc",
+        "key": "ctrl+alt+s ctrl+alt+d",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.125.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "24.x",
+    "typescript-eslint": "^8.61.1",
+    "eslint": "^10.5.0",
+    "typescript": "^6.0.3",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  }
+}
