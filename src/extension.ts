@@ -138,68 +138,144 @@ function groupIntoRegions(touchedLines: number[]): number[][] {
   return regions
 }
 
+function wholeDocumentSelection(
+  document: vscode.TextDocument,
+): vscode.Selection {
+  const lastLine = document.lineCount - 1
+  const start = new vscode.Position(0, 0)
+  const end = new vscode.Position(
+    lastLine,
+    document.lineAt(lastLine).text.length,
+  )
+  return new vscode.Selection(start, end)
+}
+
 function sortSelectedLines(
   editor: vscode.TextEditor,
   descending: boolean,
 ): Thenable<boolean> {
   const document = editor.document
-  const keys = computeLineKeys(document, editor.selections)
+  const hasRealSelection = editor.selections.some(
+    (sel) => !sel.isEmpty,
+  )
+
+  // Nothing selected (just cursor(s), no highlighted text): treat the
+  // whole document as the selection instead of prompting the user.
+  const effectiveSelections: readonly vscode.Selection[] =
+    hasRealSelection ?
+      editor.selections
+    : [wholeDocumentSelection(document)]
+
+  const keys = computeLineKeys(document, effectiveSelections)
   const touchedLines = Array.from(keys.keys())
 
   if (touchedLines.length === 0) {
-    vscode.window.showInformationMessage(
-      "Select some text on the lines you want to sort first.",
-    )
     return Promise.resolve(false)
   }
 
   const regions = groupIntoRegions(touchedLines)
 
-  return editor.edit((editBuilder) => {
-    for (const region of regions) {
-      if (region.length < 2) {
-        continue // nothing to reorder
+  // Maps an original line number to the line number it will occupy after
+  // sorting, so single-line selections can be re-placed on their line's
+  // new position afterwards.
+  const lineMap = new Map<number, number>()
+  const originalSelections = [...editor.selections]
+
+  return editor
+    .edit((editBuilder) => {
+      for (const region of regions) {
+        if (region.length < 2) {
+          continue // nothing to reorder
+        }
+
+        const infos: LineInfo[] = region.map((line) => ({
+          line,
+          fullText: document.lineAt(line).text,
+          key: keys.get(line) as string,
+        }))
+
+        infos.sort((a, b) => {
+          const cmp = naturalCompare(a.key, b.key)
+          return descending ? -cmp : cmp
+        })
+
+        const firstLine = region[0]
+        const lastLine = region[region.length - 1]
+        const range = new vscode.Range(
+          new vscode.Position(firstLine, 0),
+          new vscode.Position(
+            lastLine,
+            document.lineAt(lastLine).text.length,
+          ),
+        )
+
+        const newText = infos.map((i) => i.fullText).join("\n")
+        editBuilder.replace(range, newText)
+
+        infos.forEach((info, index) => {
+          lineMap.set(info.line, firstLine + index)
+        })
       }
+    })
+    .then((success) => {
+      if (success) {
+        repositionSingleLineSelections(
+          editor,
+          originalSelections,
+          lineMap,
+        )
+      }
+      return success
+    })
+}
 
-      const infos: LineInfo[] = region.map((line) => ({
-        line,
-        fullText: document.lineAt(line).text,
-        key: keys.get(line) as string,
-      }))
-
-      infos.sort((a, b) => {
-        const cmp = naturalCompare(a.key, b.key)
-        return descending ? -cmp : cmp
-      })
-
-      const firstLine = region[0]
-      const lastLine = region[region.length - 1]
-      const range = new vscode.Range(
-        new vscode.Position(firstLine, 0),
-        new vscode.Position(
-          lastLine,
-          document.lineAt(lastLine).text.length,
-        ),
-      )
-
-      const newText = infos.map((i) => i.fullText).join("\n")
-      editBuilder.replace(range, newText)
+/**
+ * After the sort edit is applied, move any selection that was originally
+ * confined to a single line so it stays on the same characters of that
+ * line's content, now at the line's new position. Multi-line selections
+ * are left as-is.
+ */
+function repositionSingleLineSelections(
+  editor: vscode.TextEditor,
+  originalSelections: readonly vscode.Selection[],
+  lineMap: Map<number, number>,
+): void {
+  const newSelections = originalSelections.map((sel) => {
+    if (sel.start.line !== sel.end.line) {
+      return sel // multi-line selection: leave untouched
     }
+
+    const newLine = lineMap.get(sel.start.line)
+    if (newLine === undefined || newLine === sel.start.line) {
+      return sel // line didn't move (or wasn't part of a sorted region)
+    }
+
+    const anchor = new vscode.Position(newLine, sel.anchor.character)
+    const active = new vscode.Position(newLine, sel.active.character)
+    return new vscode.Selection(anchor, active)
   })
+
+  editor.selections = newSelections
 }
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("line-sorter.sortAsc", () => {
-      const editor = vscode.window.activeTextEditor
-      if (!editor) return
-      sortSelectedLines(editor, false)
-    }),
-    vscode.commands.registerCommand("line-sorter.sortDesc", () => {
-      const editor = vscode.window.activeTextEditor
-      if (!editor) return
-      sortSelectedLines(editor, true)
-    }),
+    vscode.commands.registerCommand(
+      "line-sorter.sortAsc",
+      () => {
+        const editor = vscode.window.activeTextEditor
+        if (!editor) return
+        sortSelectedLines(editor, false)
+      },
+    ),
+    vscode.commands.registerCommand(
+      "line-sorter.sortDesc",
+      () => {
+        const editor = vscode.window.activeTextEditor
+        if (!editor) return
+        sortSelectedLines(editor, true)
+      },
+    ),
   )
 }
 
