@@ -42,12 +42,12 @@
     "keybindings": [
       {
         "command": "line-sorter.sortAsc",
-        "key": "ctrl+alt+s ctrl+alt+a",
+        "key": "alt+s alt+a",
         "when": "editorTextFocus"
       },
       {
         "command": "line-sorter.sortDesc",
-        "key": "ctrl+alt+s ctrl+alt+d",
+        "key": "alt+s alt+d",
         "when": "editorTextFocus"
       }
     ]

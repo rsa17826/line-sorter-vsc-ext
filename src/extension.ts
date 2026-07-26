@@ -191,7 +191,15 @@ function sortSelectedLines(
         const infos: LineInfo[] = region.map((line) => ({
           line,
           fullText: document.lineAt(line).text,
-          key: keys.get(line) as string,
+          // Trim: a selection that starts/ends mid-line (e.g. after the
+          // leading indentation on the first line, but at column 0 on
+          // every other line in the region) produces keys with
+          // inconsistent leading/trailing whitespace across lines. Since
+          // the key is only used for ordering (fullText is still what
+          // gets swapped in), stripping incidental whitespace here
+          // prevents it from outranking the actual content during
+          // comparison.
+          key: (keys.get(line) as string).trim(),
         }))
 
         infos.sort((a, b) => {
@@ -260,22 +268,16 @@ function repositionSingleLineSelections(
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "line-sorter.sortAsc",
-      () => {
-        const editor = vscode.window.activeTextEditor
-        if (!editor) return
-        sortSelectedLines(editor, false)
-      },
-    ),
-    vscode.commands.registerCommand(
-      "line-sorter.sortDesc",
-      () => {
-        const editor = vscode.window.activeTextEditor
-        if (!editor) return
-        sortSelectedLines(editor, true)
-      },
-    ),
+    vscode.commands.registerCommand("line-sorter.sortAsc", () => {
+      const editor = vscode.window.activeTextEditor
+      if (!editor) return
+      sortSelectedLines(editor, false)
+    }),
+    vscode.commands.registerCommand("line-sorter.sortDesc", () => {
+      const editor = vscode.window.activeTextEditor
+      if (!editor) return
+      sortSelectedLines(editor, true)
+    }),
   )
 }
 
