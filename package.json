@@ -10,7 +10,9 @@
     "Other"
   ],
   "publisher": "rssaromeo",
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
